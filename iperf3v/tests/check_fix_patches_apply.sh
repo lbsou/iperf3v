@@ -11,13 +11,11 @@ trap 'rm -rf "$work"' EXIT
 git -C "$root" worktree add -q --detach "$work/tree" "$base"
 trap 'git -C "$root" worktree remove --force "$work/tree"; rm -rf "$work"' EXIT
 cd "$work/tree"
-git config user.name iperf3v-check
-git config user.email iperf3v-check@invalid
 
 fixes=$(git -C "$root" log --reverse --format='%H %s' "$base..HEAD" | awk '$2 == "fix:" {print $1}')
 [ -n "$fixes" ] || { echo "no fix: commit"; exit 0; }
 for c in $fixes; do
-    if ! git cherry-pick -x "$c" >/dev/null 2>&1; then
+    if ! git -c user.name=iperf3v-check -c user.email=iperf3v-check@invalid cherry-pick -x "$c" >/dev/null 2>&1; then
         echo "FAIL: $(git -C "$root" log -1 --format='%h %s' "$c") does not apply on $base"
         exit 1
     fi

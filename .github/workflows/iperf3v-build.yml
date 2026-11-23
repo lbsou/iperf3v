@@ -1,0 +1,62 @@
+name: iperf3v build
+
+on:
+  push:
+    branches: ['fork/**']
+  pull_request:
+    branches: ['fork/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build and unit tests
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libssl-dev
+          ./configure --disable-shared
+          make -j"$(nproc)"
+          make check
+      - name: Check version and --cntl-ka
+        run: |
+          src/iperf3 --version | head -1
+          src/iperf3 --version | head -1 | grep -q -- '-v[0-9]'
+          src/iperf3 --help | grep -q -- --cntl-ka
+      - name: fix commits apply on the ESnet base tag
+        run: bash iperf3v/tests/check_fix_patches_apply.sh
+
+  cygwin:
+    runs-on: windows-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: cygwin/cygwin-install-action@v4
+        with:
+          packages: gcc-core make libssl-devel zlib-devel
+      - name: Build
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          ./configure --with-openssl=/usr | tee cfg.log
+          grep -q 'TCP_KEEPIDLE socket option... yes' cfg.log
+          make -j4
+          B=src/.libs/iperf3.exe; [ -f "$B" ] || B=src/iperf3.exe
+          "$B" --version | head -1
+          "$B" --help | grep -q -- --cntl-ka
+      - name: Loopback smoke test (single-stream -u and -R; see PATCHLOG Known issues)
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          B=src/.libs/iperf3.exe; [ -f "$B" ] || B=src/iperf3.exe
+          for mode in "" "-R"; do
+            "$B" -s -1 -p 5299 > /dev/null 2>&1 &
+            sleep 2
+            "$B" -c 127.0.0.1 -p 5299 -u -b 1M -t 2 $mode
+            wait
+          done

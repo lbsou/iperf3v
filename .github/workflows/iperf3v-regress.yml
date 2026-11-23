@@ -1,0 +1,21 @@
+name: iperf3v network regressions
+
+on:
+  push:
+    branches: ['fork/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  netns:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build the fork and the ESnet base tag, run iperf3v/tests
+        run: |
+          sudo modprobe sch_netem || true
+          sudo GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash iperf3v/tests/ci-linux.sh
