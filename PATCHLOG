@@ -57,6 +57,16 @@ Patches on 3.22.1
     fork: identify as iperf3v 3.22.1-v1
         configure.ac, configure, PATCHLOG, README-iperf3v.md, iperf3v/BASE_TAG.
 
+    fork: add Linux netns regression harness
+        iperf3v/tests/ - netns/netem/iptables helpers, ci-linux.sh, run_all.sh.
+
+    fix: udp: tolerate out-of-order packets while waiting for the connect
+    reply in --bidir mode
+        src/iperf_udp.c - iperf_udp_connect(): the out-of-order tolerance of
+        -R (PR #1260) also applies to --bidir. netem "delay 30ms 12ms":
+        10/20 failed before, 0/20 after (iperf3v/tests/test_bidir_reorder.sh).
+        Upstream: not proposed.
+
 Build checks (every port)
 -------------------------
 
