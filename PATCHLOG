@@ -86,6 +86,17 @@ Patches on 3.22.1
         Related upstream: esnet/iperf#1402 (UDP connect retry).
         Upstream: not proposed.
 
+    fix: udp: server answers a repeated connect message on an already
+    accepted stream
+        src/iperf_udp.c, src/iperf_udp.h, src/iperf_server_api.c - while it
+        creates streams, the server also selects on the UDP streams already
+        accepted and answers a repeated connect message (lost reply of the
+        first stream: --bidir, -P > 1). Needs iperf3v on both ends.
+        Upstream: not proposed.
+
+    fork: check that fix patches apply on the ESnet base tag
+        iperf3v/tests/check_fix_patches_apply.sh.
+
 Known issues
 ------------
 

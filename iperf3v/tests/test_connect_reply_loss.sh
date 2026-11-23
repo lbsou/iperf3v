@@ -56,11 +56,10 @@ for mode in "" "-R" "--bidir"; do
     case_loss "$OWN" "$REF" none $mode
 done
 
-# The server answers a repeated connect while it still creates streams (task 5).
-if [ "${WITH_SERVER_FIX:-0}" = 1 ]; then
-    case_loss "$OWN" "$OWN" 0 -P 2
-    case_loss "$OWN" "$OWN" 0 -R -P 2
-    case_loss "$OWN" "$OWN" 0 --bidir
-fi
+# The server answers a repeated connect while it still creates the other streams:
+# the reply of the first stream is lost and the client cannot open the next one.
+case_loss "$OWN" "$OWN" 0 -P 2
+case_loss "$OWN" "$OWN" 0 -R -P 2
+case_loss "$OWN" "$OWN" 0 --bidir
 
 exit $failed
