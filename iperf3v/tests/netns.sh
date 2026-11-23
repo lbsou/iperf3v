@@ -39,9 +39,11 @@ netem_server() {
 }
 
 # Drop the (n+1)-th UDP connect reply sent by the server (n counts from 0).
-# A connect reply is a 4-byte UDP payload: 32-byte IPv4 packet.
+# A connect reply is a 4-byte UDP payload: 32-byte IPv4 packet. It is dropped on
+# the client's input, like a loss on the way: a DROP in the server's OUTPUT chain
+# would make the server's write() fail with EPERM instead.
 drop_nth_reply() {
-    ip netns exec "$NS_S" iptables -A OUTPUT -p udp --sport "$PORT" \
+    ip netns exec "$NS_C" iptables -A INPUT -p udp --sport "$PORT" \
         -m length --length 32 \
         -m statistic --mode nth --every 1000000 --packet "$1" -j DROP
 }

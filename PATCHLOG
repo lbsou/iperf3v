@@ -67,6 +67,35 @@ Patches on 3.22.1
         10/20 failed before, 0/20 after (iperf3v/tests/test_bidir_reorder.sh).
         Upstream: not proposed.
 
+    fix: net: return one datagram per read in Nrecv_no_select for UDP
+        src/net.c - the read loop filled the whole buffer, so a short UDP
+        datagram was concatenated with the following ones (and the read
+        blocked until blksize bytes had arrived). Data datagrams fill the
+        buffer at once and are unaffected.
+        Upstream: not proposed.
+
+    fix: udp: resend the connect message and accept the first reverse
+    datagram as an implicit reply
+        src/iperf.h, src/iperf_udp.c, src/iperf_udp.h - the client resends
+        UDP_CONNECT_MSG every UDP_CONNECT_RETRY_INTERVAL_MS (1 s) until
+        UDP_CONNECT_TIMEOUT_SEC (30 s); in -R/--bidir a data datagram counts
+        as the reply; a 4-byte connect message or reply on a stream socket is
+        never counted as data, and the server answers a repeated connect
+        message on a running receive stream. Against an ESnet server the
+        resend has no effect except in -R/--bidir (implicit reply).
+        Related upstream: esnet/iperf#1402 (UDP connect retry).
+        Upstream: not proposed.
+
+Known issues
+------------
+
+    Windows/Cygwin server, UDP with more than one stream socket (-P > 1, or
+    --bidir): the second connect message never reaches the new listener
+    (Windows does not hand datagrams to the most specific of two sockets
+    bound to the same port like Linux does), so the test fails after 30 s.
+    Present in every ventana build. Single-stream -u and -R work. Windows
+    clients against a Linux server are not affected.
+
 Build checks (every port)
 -------------------------
 
