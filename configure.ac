@@ -220,7 +220,8 @@ fi
 AC_CACHE_CHECK([TCP_KEEPIDLE socket option],
 [iperf3_cv_header_tcp_keepalive],
 AC_COMPILE_IFELSE(
-  [AC_LANG_PROGRAM([[#include <netinet/tcp.h>]],
+  [AC_LANG_PROGRAM([[#include <sys/types.h>
+                     #include <netinet/tcp.h>]],
                    [[int foo = TCP_KEEPIDLE;]])],
   iperf3_cv_header_tcp_keepalive=yes,
   iperf3_cv_header_tcp_keepalive=no))

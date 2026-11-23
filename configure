@@ -17469,7 +17469,8 @@ then :
 else case e in #(
   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-#include <netinet/tcp.h>
+#include <sys/types.h>
+                     #include <netinet/tcp.h>
 int
 main (void)
 {
