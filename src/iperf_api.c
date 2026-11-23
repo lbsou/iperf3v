@@ -2133,14 +2133,16 @@ iperf_check_throttle(struct iperf_stream *sp, struct iperf_time *nowP)
     }
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-    if (missing_rate < 0) {
+    /* missing_rate == 0 must wait too (truncated average, see the POSIX branch below) */
+    if (missing_rate <= 0) {
         static int timer_debug_printed = 0;  /* Print debug message only once */
         /* Spin threshold: final spin loop for last N nanoseconds for µs precision */
         const int64_t SPIN_THRESHOLD_NS = 200000;  /* 200µs - tune for precision vs CPU */
 
         delta_bits_win = bits_sent - (seconds * sp->test->settings->rate);
         time_to_green_light_win = (SEC_TO_NS * delta_bits_win / sp->test->settings->rate);
-        if (time_to_green_light_win > 0) {
+        /* >= 0 like the POSIX branch: a zero wait turns the green light on instead of looping */
+        if (time_to_green_light_win >= 0) {
             HANDLE hTimer;
             LARGE_INTEGER liDueTime;
             LARGE_INTEGER freq, start, now_time, target;
