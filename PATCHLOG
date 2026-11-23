@@ -97,6 +97,17 @@ Patches on 3.22.1
     fork: check that fix patches apply on the ESnet base tag
         iperf3v/tests/check_fix_patches_apply.sh.
 
+    fork: CI for Linux, Cygwin and network regressions
+        .github/workflows/iperf3v-build.yml, iperf3v-regress.yml.
+
+    fork: weekly ESnet watch, issue templates and labels
+        .github/workflows/iperf3v-upstream-watch.yml, iperf3v/watch/,
+        .github/ISSUE_TEMPLATE/, iperf3v/setup-labels.sh.
+
+    fork: release packaging for Linux and Windows
+        .github/workflows/iperf3v-release.yml, iperf3v/package-linux.sh,
+        iperf3v/package-cygwin.sh.
+
 Known issues
 ------------
 
