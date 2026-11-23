@@ -659,6 +659,12 @@ iperf_run_server(struct iperf_test *test)
         memcpy(&read_set, &test->read_set, sizeof(fd_set));
         memcpy(&write_set, &test->write_set, sizeof(fd_set));
 
+        /* A UDP client whose connect reply was lost repeats its connect message on an accepted stream */
+        if (test->state == CREATE_STREAMS && test->protocol->id == Pudp) {
+            SLIST_FOREACH(sp, &test->streams, streams)
+                FD_SET(sp->socket, &read_set);
+        }
+
 	iperf_time_now(&now);
 	timeout = tmr_timeout(&now);
 
@@ -779,6 +785,10 @@ iperf_run_server(struct iperf_test *test)
             }
 
             if (test->state == CREATE_STREAMS) {
+                if (test->protocol->id == Pudp && iperf_udp_poll_accepted_streams(test, &read_set) < 0) {
+                    cleanup_server(test);
+                    return -1;
+                }
                 if (FD_ISSET(test->prot_listener, &read_set)) {
 
                     if ((s = test->protocol->accept(test)) < 0) {

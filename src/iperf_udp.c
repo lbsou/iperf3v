@@ -81,6 +81,30 @@ iperf_udp_handle_ctrl_dgram(struct iperf_test *test, int s, const void *buf, int
     return 1;
 }
 
+/* iperf_udp_poll_accepted_streams
+ *
+ * answers repeated connect messages on accepted streams while streams are created
+ */
+int
+iperf_udp_poll_accepted_streams(struct iperf_test *test, fd_set *read_set)
+{
+    struct iperf_stream *sp;
+    char buf[16];
+    int sz;
+
+    SLIST_FOREACH(sp, &test->streams, streams) {
+        if (!FD_ISSET(sp->socket, read_set))
+            continue;
+        FD_CLR(sp->socket, read_set);
+        /* Nothing but a connect message is expected before the test starts: errors are not fatal */
+        if ((sz = recv(sp->socket, buf, sizeof(buf), 0)) <= 0)
+            continue;
+        if (iperf_udp_handle_ctrl_dgram(test, sp->socket, buf, sz) < 0)
+            return -1;
+    }
+    return 0;
+}
+
 /* iperf_udp_recv
  *
  * receives the data for UDP

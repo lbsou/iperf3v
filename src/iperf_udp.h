@@ -69,5 +69,14 @@ int iperf_udp_init(struct iperf_test *);
  */
 int iperf_udp_handle_ctrl_dgram(struct iperf_test *test, int s, const void *buf, int len);
 
+/**
+ * iperf_udp_poll_accepted_streams -- while the server still creates streams,
+ * read the streams already accepted that select() marked readable in read_set
+ * and answer a connect message repeated by a client whose reply was lost.
+ *
+ * returns 0 on success, -1 on error
+ */
+int iperf_udp_poll_accepted_streams(struct iperf_test *test, fd_set *read_set);
+
 
 #endif
