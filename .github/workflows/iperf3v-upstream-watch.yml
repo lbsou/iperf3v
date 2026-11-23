@@ -8,6 +8,7 @@ on:
 permissions:
   issues: write
   contents: read
+  pull-requests: read   # without it, the /issues API leaves ESnet's pull requests out
 
 jobs:
   watch:
