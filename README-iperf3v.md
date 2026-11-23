@@ -22,12 +22,12 @@ La liste à jour des patchs, avec leur statut en amont, est dans [`PATCHLOG`](PA
 - **Interopérabilité** : un `iperf3v` fonctionne face à un iperf3 ESnet, dans les deux sens. Les
   correctifs qui demandent `iperf3v` aux deux bouts retombent sur le comportement d'origine sinon.
   Les limites connues sont dans la section « Known issues » et les notes du `PATCHLOG`.
-- **Serveur Windows** : en UDP, un serveur Windows ne gère pas encore plus d'une socket de flux
-  (`-P 2`, `--bidir`) ; voir « Known issues ».
+- **Serveur Windows** : en UDP, une socket de réception partagée permet au serveur Windows de gérer
+  plusieurs flux (`-P 2`, `--bidir`), ce que Windows empêche avec le code d'ESnet.
 
 ## Versions
 
-`<tag ESnet>-vN` : `3.22.1-v1` est la première version d'iperf3v sur le tag ESnet `3.22.1`.
+`<tag ESnet>-vN` : `3.22.1-v1` était la première version d'iperf3v sur le tag ESnet `3.22.1`.
 `N` augmente à chaque publication sur le même tag et revient à 1 sur un nouveau tag ESnet.
 `iperf3v --version` l'affiche. Tag Git de publication : `v3.22.1-v1`.
 

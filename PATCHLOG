@@ -116,17 +116,27 @@ Patches on 3.22.1
         .github/workflows/iperf3v-release.yml, iperf3v/package-linux.sh,
         iperf3v/package-cygwin.sh.
 
+    windows: udp: shared receive socket for UDP servers with several streams
+        src/iperf_udp.c, src/iperf_udp.h, src/iperf.h, src/iperf_api.c,
+        src/iperf_server_api.c - Windows hands every UDP datagram to the
+        first socket bound to the port and never to a later one, connected or
+        not (a connected first socket drops other peers' datagrams). So a
+        Windows server failed with more than one stream socket (-P > 1,
+        --bidir) since the first ventana build. On Windows/Cygwin only
+        (IPERF_UDP_SHARED_RCV), the listener stays unconnected as the shared
+        receive socket; each stream gets its own socket bound to the same port
+        and connected to the client, used to send; the first receiving
+        stream's thread reads the shared socket and dispatches each datagram
+        by sender address (each stream's statistics keep a single writer); a
+        connect message repeated by an accepted client is answered on its
+        stream's socket. Linux and other systems keep the ESnet code.
+        Test: iperf3v/tests/windows_loopback.sh (CI, Cygwin job).
+        Upstream: not proposed (ESnet does not support Windows).
+
+    fork: version 3.22.1-v2
+
 Known issues
 ------------
-
-    Windows/Cygwin server, UDP with more than one stream socket (-P > 1, or
-    --bidir): the second connect message never reaches the new listener
-    (Windows does not hand datagrams to the most specific of two sockets
-    bound to the same port like Linux does), so the test fails after 30 s.
-    Present in every ventana build. Single-stream -u and -R work. Windows
-    clients against a Linux server are not affected. (The cause is not
-    proven yet; changing "missing_rate < 0" to "<= 0" in
-    iperf_check_throttle was tried and does not change it.)
 
     After a lost reply, the server's statistics start up to one resend
     interval before the client sends: receiver duration is longer and the

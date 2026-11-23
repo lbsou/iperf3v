@@ -51,14 +51,8 @@ jobs:
           B=src/.libs/iperf3.exe; [ -f "$B" ] || B=src/iperf3.exe
           "$B" --version | head -1
           "$B" --help | grep -q -- --cntl-ka
-      - name: Loopback smoke test (single-stream -u and -R; see PATCHLOG Known issues)
+      - name: Loopback UDP server tests, one and several stream sockets
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
         run: |
           cd "$GITHUB_WORKSPACE"
-          B=src/.libs/iperf3.exe; [ -f "$B" ] || B=src/iperf3.exe
-          for mode in "" "-R"; do
-            "$B" -s -1 -p 5299 > /dev/null 2>&1 &
-            sleep 2
-            "$B" -c 127.0.0.1 -p 5299 -u -b 1M -t 2 $mode
-            wait
-          done
+          bash iperf3v/tests/windows_loopback.sh
