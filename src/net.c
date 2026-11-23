@@ -570,7 +570,9 @@ Nrecv_no_select(int fd, char *buf, size_t count, int prot, int sock_opt)
             buf += r;
         }
 
-
+        /* A UDP read returns one datagram: never concatenate a short datagram with the next ones */
+        if (prot == SOCK_DGRAM) /* Pudp */
+            break;
     }
     return count - nleft;
 }
