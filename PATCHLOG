@@ -1,0 +1,71 @@
+PATCHLOG - iperf3v patch series
+===============================
+
+Base:    ESnet iperf, git tag in iperf3v/BASE_TAG (https://github.com/esnet/iperf)
+Branch:  fork/<base tag>  (never rewritten; corrections are "fixup!" commits,
+         squashed only when the series is ported to the next ESnet tag)
+Version: <base tag>-vN, set by AC_INIT (configure.ac and configure)
+
+Each patch is one commit. The prefix of the commit title is its label:
+
+    windows:  Windows/Cygwin port, not proposed upstream as is
+    fix:      generic bug fix, must apply alone on the ESnet tag; proposed upstream
+    feature:  addition specific to iperf3v
+    fork:     identity of the fork (version, docs, tests, CI), never proposed upstream
+
+Upstream status: not proposed / issue #n / PR #n / merged in 3.x (patch dropped
+at the next port).
+
+Patches on 3.22.1
+-----------------
+
+    windows: dscp: fix Cygwin/Windows header includes
+        src/dscp.c - strcasecmp and IP_TOS headers on Cygwin/Win32.
+        Upstream: not proposed.
+
+    windows: net: add TransmitFile zero-copy support for Windows/Cygwin
+        src/net.c - Nsendfile() through TransmitFile.
+        Upstream: not proposed.
+
+    windows: util: report TransmitFile in zerocopy feature string
+        src/iperf_util.c - "sendfile / zerocopy" feature line.
+        Upstream: not proposed.
+
+    windows: api: add Windows high-resolution timer for rate throttling
+        src/iperf_api.c - iperf_check_throttle(): CreateWaitableTimerExW
+        HIGH_RESOLUTION + 200us QPC spin, fallback Sleep + QPC spin;
+        --debug prints which path is used.
+        Upstream: not proposed.
+
+    windows: api: make TOS/DSCP setsockopt non-fatal on Windows
+        src/iperf_api.c - IP_TOS / IPV6_TCLASS failures become warnings.
+        Upstream: not proposed.
+
+    fix: udp: fix --skip-rx-copy byte accounting
+        src/iperf_udp.c - with MSG_TRUNC the received size is the truncated
+        size; count blksize instead.
+        Upstream: not proposed.
+
+    windows: configure: include <sys/types.h> in TCP_KEEPIDLE check so
+    --cntl-ka is enabled on Cygwin
+        configure.ac and configure - Cygwin's <netinet/tcp.h> uses u_int16_t
+        without including <sys/types.h>, so the check failed and --cntl-ka
+        was missing. Edits the generated configure too (no automake on
+        Cygwin; AM_MAINTAINER_MODE keeps make from regenerating it).
+        Upstream: not proposed.
+
+    fork: identify as iperf3v 3.22.1-v1
+        configure.ac, configure, PATCHLOG, README-iperf3v.md, iperf3v/BASE_TAG.
+
+Build checks (every port)
+-------------------------
+
+    configure must print:
+        checking whether compiling and linking against OpenSSL works... yes
+        checking TCP_KEEPIDLE socket option... yes
+    and "iperf3 --help" must list --cntl-ka.
+
+    Cygwin (C:\cygwin64, packages gcc-core make libssl-devel zlib-devel):
+        ./configure --with-openssl=/usr && make -j8
+        Runtime DLLs shipped next to iperf3v.exe: cygwin1.dll, cygcrypto-3.dll,
+        cygz.dll (check with: ldd iperf3v.exe | grep -vi windows)
