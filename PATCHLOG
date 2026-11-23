@@ -135,6 +135,21 @@ Patches on 3.22.1
 
     fork: version 3.22.1-v2
 
+    fix: api: sleep in iperf_check_throttle when the average rate equals
+    the target
+        src/iperf_api.c - the average rate since the start is truncated to
+        whole bits per second; once the elapsed time in seconds exceeds the
+        packet size in bits (218-byte packets: about 29 min; 1200-byte: about
+        2 h 40) one packet no longer moves it, missing_rate stays at 0, and
+        the sender used to spin at 100 % of a core (red light, no sleep).
+        Sleeps when missing_rate <= 0. Present since ESnet 3.18.
+        The Windows branch of the same function (patch "windows: api: add
+        Windows high-resolution timer") had the same hole; its fixup commit
+        also accepts a zero wait.
+        Tests: iperf3v/tests/test_throttle_cpu.sh (Linux, 100 % -> 0 %),
+        iperf3v/tests/windows_throttle.sh (Cygwin, 93 % -> 0 %).
+        Upstream: not proposed.
+
 Known issues
 ------------
 
