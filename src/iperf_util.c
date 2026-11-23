@@ -289,7 +289,7 @@ get_optional_features(void)
     numfeatures++;
 #endif /* HAVE_TCP_CONGESTION */
 
-#if defined(HAVE_SENDFILE)
+#if defined(HAVE_SENDFILE) || defined(HAVE_TRANSMITFILE)
     if (numfeatures > 0) {
 	strncat(features, ", ",
 		sizeof(features) - strlen(features) - 1);
@@ -297,7 +297,7 @@ get_optional_features(void)
     strncat(features, "sendfile / zerocopy",
 	sizeof(features) - strlen(features) - 1);
     numfeatures++;
-#endif /* HAVE_SENDFILE */
+#endif /* HAVE_SENDFILE || HAVE_TRANSMITFILE */
 
 #if defined(HAVE_SO_MAX_PACING_RATE)
     if (numfeatures > 0) {
