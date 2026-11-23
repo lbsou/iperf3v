@@ -27,13 +27,22 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <strings.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
-#ifdef WIN32
+#if defined(__CYGWIN__)
+/* Cygwin uses POSIX headers, include strings.h for strcasecmp */
+#include <strings.h>
+#elif defined(_WIN32)
+/* Native Windows */
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#ifndef strcasecmp
 #define strcasecmp(a,b) _stricmp(a,b)
-#define snprintf _snprintf
+#endif
+#else
+/* Other POSIX systems */
+#include <strings.h>
 #endif
 
 int parse_qos(const char *cp);
@@ -48,6 +57,16 @@ const char * iptos2str(int iptos);
 #endif
 #ifdef HAVE_NETINET_IP_H
 #include <netinet/ip.h>
+#endif
+
+/* Native Windows: ensure IP_TOS is defined */
+#if defined(_WIN32) && !defined(__CYGWIN__)
+#ifndef IP_TOS
+#define IP_TOS 3
+#endif
+#ifndef IPV6_TCLASS
+#define IPV6_TCLASS 39
+#endif
 #endif
 
 #ifndef IPTOS_LOWDELAY
