@@ -38,6 +38,11 @@ netem_server() {
     ip netns exec "$NS_S" tc qdisc replace dev i3v-vs root netem "$@"
 }
 
+# netem on the client egress (with netem_server: delay in both directions).
+netem_client() {
+    ip netns exec "$NS_C" tc qdisc replace dev i3v-vc root netem "$@"
+}
+
 # Drop the (n+1)-th UDP connect reply sent by the server (n counts from 0).
 # A connect reply is a 4-byte UDP payload: 32-byte IPv4 packet. It is dropped on
 # the client's input, like a loss on the way: a DROP in the server's OUTPUT chain

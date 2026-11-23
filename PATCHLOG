@@ -76,13 +76,20 @@ Patches on 3.22.1
 
     fix: udp: resend the connect message and accept the first reverse
     datagram as an implicit reply
-        src/iperf.h, src/iperf_udp.c, src/iperf_udp.h - the client resends
-        UDP_CONNECT_MSG every UDP_CONNECT_RETRY_INTERVAL_MS (1 s) until
-        UDP_CONNECT_TIMEOUT_SEC (30 s); in -R/--bidir a data datagram counts
-        as the reply; a 4-byte connect message or reply on a stream socket is
-        never counted as data, and the server answers a repeated connect
-        message on a running receive stream. Against an ESnet server the
-        resend has no effect except in -R/--bidir (implicit reply).
+        src/iperf.h, src/iperf_udp.c, src/iperf_udp.h, src/iperf_client_api.c
+        - the client resends UDP_CONNECT_MSG until UDP_CONNECT_TIMEOUT_SEC
+        (30 s). The first resend waits max(1 s, 4 control round trips, measured
+        around the parameter exchange), then the wait doubles up to 8 s, so a
+        slow reply is not taken for a lost one. In -R/--bidir a data datagram
+        counts as the reply. A 4-byte connect message or reply on a stream
+        socket is never counted as data, and the server answers a repeated
+        connect message on a running receive stream.
+        Needs: "fix: net: return one datagram per read" (the server side).
+        Against an ESnet server: a lost reply is recovered in -R/--bidir
+        (implicit reply); in -u mode the test still fails as before, and a
+        resend that reaches an ESnet server which did reply (reply later than
+        4 round trips) is read as data and corrupts its loss counters
+        (iperf3v/tests/test_slow_reply.sh covers 1.2 s round trips).
         Related upstream: esnet/iperf#1402 (UDP connect retry).
         Upstream: not proposed.
 
@@ -92,6 +99,7 @@ Patches on 3.22.1
         creates streams, the server also selects on the UDP streams already
         accepted and answers a repeated connect message (lost reply of the
         first stream: --bidir, -P > 1). Needs iperf3v on both ends.
+        Needs: the resend fix above.
         Upstream: not proposed.
 
     fork: check that fix patches apply on the ESnet base tag
@@ -116,7 +124,13 @@ Known issues
     (Windows does not hand datagrams to the most specific of two sockets
     bound to the same port like Linux does), so the test fails after 30 s.
     Present in every ventana build. Single-stream -u and -R work. Windows
-    clients against a Linux server are not affected.
+    clients against a Linux server are not affected. (The cause is not
+    proven yet; changing "missing_rate < 0" to "<= 0" in
+    iperf_check_throttle was tried and does not change it.)
+
+    After a lost reply, the server's statistics start up to one resend
+    interval before the client sends: receiver duration is longer and the
+    bitrate lower by that much.
 
 Build checks (every port)
 -------------------------
