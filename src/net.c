@@ -63,6 +63,29 @@
 #include <netinet/in.h>
 #endif /* HAVE_IP_BOUND_IF */
 
+/* TransmitFile support for Windows and Cygwin */
+#if defined(__CYGWIN__)
+/* Cygwin: avoid winsock2.h conflicts by using minimal Windows headers */
+#define WIN32_LEAN_AND_MEAN
+#define _WIN32_WINNT 0x0600
+#include <windows.h>
+#include <io.h>
+/* Minimal definitions for TransmitFile - avoids winsock2.h conflicts */
+typedef UINT_PTR CYGWIN_SOCKET;
+#define TF_USE_KERNEL_APC 0x20
+typedef BOOL (WINAPI *TransmitFile_t)(CYGWIN_SOCKET, HANDLE, DWORD, DWORD, LPVOID, LPVOID, DWORD);
+static TransmitFile_t pTransmitFile = NULL;
+static int transmitfile_loaded = 0;
+#define HAVE_TRANSMITFILE 1
+#elif defined(_WIN32)
+/* Native Windows: use standard headers */
+#include <winsock2.h>
+#include <mswsock.h>
+#include <windows.h>
+#include <io.h>
+#define HAVE_TRANSMITFILE 1
+#endif
+
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif /* HAVE_POLL_H */
@@ -759,10 +782,23 @@ has_sendfile(void)
 {
 #if defined(HAVE_SENDFILE)
     return 1;
-#else /* HAVE_SENDFILE */
+#elif defined(HAVE_TRANSMITFILE)
+#ifdef __CYGWIN__
+    /* Cygwin: dynamically check if TransmitFile is available */
+    if (!transmitfile_loaded) {
+        HMODULE hMswsock = LoadLibraryA("mswsock.dll");
+        if (hMswsock) {
+            pTransmitFile = (TransmitFile_t)GetProcAddress(hMswsock, "TransmitFile");
+        }
+        transmitfile_loaded = 1;
+    }
+    return (pTransmitFile != NULL);
+#else
+    return 1;
+#endif
+#else
     return 0;
-#endif /* HAVE_SENDFILE */
-
+#endif
 }
 
 
@@ -773,7 +809,84 @@ has_sendfile(void)
 int
 Nsendfile(int fromfd, int tofd, const char *buf, size_t count)
 {
-#if defined(HAVE_SENDFILE)
+#if defined(HAVE_TRANSMITFILE)
+    /* Windows/Cygwin implementation using TransmitFile */
+    HANDLE hFile;
+    DWORD nleft;
+    LARGE_INTEGER liOffset;
+    BOOL result;
+
+#ifdef __CYGWIN__
+    /* Cygwin: dynamically load TransmitFile to avoid header conflicts */
+    CYGWIN_SOCKET hSocket;
+
+    if (!transmitfile_loaded) {
+        HMODULE hMswsock = LoadLibraryA("mswsock.dll");
+        if (hMswsock) {
+            pTransmitFile = (TransmitFile_t)GetProcAddress(hMswsock, "TransmitFile");
+        }
+        transmitfile_loaded = 1;
+    }
+    if (!pTransmitFile) {
+        errno = ENOSYS;
+        return NET_HARDERROR;
+    }
+
+    /* Convert file descriptors to Windows handles */
+    hFile = (HANDLE)_get_osfhandle(fromfd);
+    hSocket = (CYGWIN_SOCKET)_get_osfhandle(tofd);
+
+    if (hFile == INVALID_HANDLE_VALUE || hSocket == (CYGWIN_SOCKET)INVALID_HANDLE_VALUE) {
+        errno = EBADF;
+        return NET_HARDERROR;
+    }
+#else
+    /* Native Windows */
+    SOCKET hSocket;
+    hFile = (HANDLE)_get_osfhandle(fromfd);
+    hSocket = (SOCKET)tofd;
+
+    if (hFile == INVALID_HANDLE_VALUE || hSocket == INVALID_SOCKET) {
+        errno = EBADF;
+        return NET_HARDERROR;
+    }
+#endif
+
+    nleft = (DWORD)count;
+    liOffset.QuadPart = 0;
+
+    while (nleft > 0) {
+        /* Set file position for current chunk */
+        liOffset.QuadPart = count - nleft;
+        if (!SetFilePointerEx(hFile, liOffset, NULL, FILE_BEGIN)) {
+            errno = EIO;
+            return NET_HARDERROR;
+        }
+
+        /* TransmitFile sends from current file position */
+#ifdef __CYGWIN__
+        result = pTransmitFile(hSocket, hFile, nleft, 0, NULL, NULL, TF_USE_KERNEL_APC);
+#else
+        result = TransmitFile(hSocket, hFile, nleft, 0, NULL, NULL, TF_USE_KERNEL_APC);
+#endif
+
+        if (!result) {
+            DWORD err = GetLastError();
+            if (err == ERROR_IO_PENDING || err == ERROR_IO_INCOMPLETE) {
+                if (count == nleft)
+                    return NET_SOFTERROR;
+                return count - nleft;
+            }
+            errno = EIO;
+            return NET_HARDERROR;
+        }
+
+        /* TransmitFile succeeded - all bytes sent */
+        nleft = 0;
+    }
+    return count;
+
+#elif defined(HAVE_SENDFILE)
     off_t offset;
 #if defined(__FreeBSD__) || (defined(__APPLE__) && defined(__MACH__) && defined(MAC_OS_X_VERSION_10_6))
     off_t sent;
