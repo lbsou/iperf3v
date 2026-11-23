@@ -46,6 +46,30 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#if defined(__CYGWIN__)
+/* Cygwin: only include windows.h for timer functions, avoid winsock conflicts */
+#define WIN32_LEAN_AND_MEAN
+#define _WINSOCKAPI_  /* Prevent winsock.h inclusion */
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+#elif defined(_WIN32)
+/* Native Windows */
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+#ifndef IP_TOS
+#define IP_TOS 3
+#endif
+#ifndef IPV6_TCLASS
+#define IPV6_TCLASS 39
+#endif
+#endif
 #include <stdint.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -2090,6 +2114,9 @@ iperf_check_throttle(struct iperf_stream *sp, struct iperf_time *nowP)
 #if defined(HAVE_CLOCK_NANOSLEEP)
     int64_t ns;
 #endif /* HAVE_CLOCK_NANOSLEEP */
+#if defined(_WIN32) || defined(__CYGWIN__)
+    int64_t time_to_green_light_win, delta_bits_win;
+#endif /* _WIN32 */
 
     if (sp->test->done || sp->test->settings->rate == 0)
         return;
@@ -2105,7 +2132,78 @@ iperf_check_throttle(struct iperf_stream *sp, struct iperf_time *nowP)
         sp->green_light = 0;
     }
 
-#if defined(HAVE_CLOCK_NANOSLEEP) || defined(HAVE_NANOSLEEP)
+#if defined(_WIN32) || defined(__CYGWIN__)
+    if (missing_rate < 0) {
+        static int timer_debug_printed = 0;  /* Print debug message only once */
+        /* Spin threshold: final spin loop for last N nanoseconds for µs precision */
+        const int64_t SPIN_THRESHOLD_NS = 200000;  /* 200µs - tune for precision vs CPU */
+
+        delta_bits_win = bits_sent - (seconds * sp->test->settings->rate);
+        time_to_green_light_win = (SEC_TO_NS * delta_bits_win / sp->test->settings->rate);
+        if (time_to_green_light_win > 0) {
+            HANDLE hTimer;
+            LARGE_INTEGER liDueTime;
+            LARGE_INTEGER freq, start, now_time, target;
+            int64_t sleep_ns, spin_ns;
+
+            /* Get high-precision timing */
+            QueryPerformanceFrequency(&freq);
+            QueryPerformanceCounter(&start);
+            target.QuadPart = start.QuadPart + (time_to_green_light_win * freq.QuadPart) / SEC_TO_NS;
+
+            /* Try to create a high-resolution waitable timer (Windows 10 1803+) */
+            hTimer = CreateWaitableTimerExW(NULL, NULL,
+                CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+
+            if (hTimer != NULL) {
+                /* Debug: confirm high-resolution timer is in use */
+                if (!timer_debug_printed && sp->test->debug) {
+                    iperf_printf(sp->test, "DEBUG: Using hybrid timer (high-res waitable + QPC spin) ~1-10µs precision\n");
+                    timer_debug_printed = 1;
+                }
+
+                /* Hybrid approach: sleep most of the time, spin for final microseconds */
+                if (time_to_green_light_win > SPIN_THRESHOLD_NS * 2) {
+                    /* Sleep for (total - spin_threshold) using high-res timer */
+                    sleep_ns = time_to_green_light_win - SPIN_THRESHOLD_NS;
+                    liDueTime.QuadPart = -(sleep_ns / 100);  /* 100ns units, negative = relative */
+
+                    if (SetWaitableTimer(hTimer, &liDueTime, 0, NULL, NULL, FALSE)) {
+                        WaitForSingleObject(hTimer, INFINITE);
+                    }
+                }
+                CloseHandle(hTimer);
+
+                /* Spin for final microseconds using QueryPerformanceCounter */
+                do {
+                    YieldProcessor();
+                    QueryPerformanceCounter(&now_time);
+                } while (now_time.QuadPart < target.QuadPart);
+
+                sp->green_light = 1;
+            } else {
+                /* Debug: fallback timer */
+                if (!timer_debug_printed && sp->test->debug) {
+                    iperf_printf(sp->test, "DEBUG: Using Sleep + QPC spin fallback ~1-10µs precision\n");
+                    timer_debug_printed = 1;
+                }
+
+                /* Fallback: coarse Sleep + fine spin */
+                if (time_to_green_light_win > 2000000) {  /* > 2ms */
+                    Sleep((DWORD)((time_to_green_light_win / 1000000) - 1));
+                }
+
+                /* Spin for remaining time */
+                do {
+                    YieldProcessor();
+                    QueryPerformanceCounter(&now_time);
+                } while (now_time.QuadPart < target.QuadPart);
+
+                sp->green_light = 1;
+            }
+        }
+    }
+#elif defined(HAVE_CLOCK_NANOSLEEP) || defined(HAVE_NANOSLEEP)
     // If estimated time to next send is large enough, sleep instead of just CPU looping until green light is set
     if (missing_rate < 0) {
         delta_bits = bits_sent - (seconds * sp->test->settings->rate);
