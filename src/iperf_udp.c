@@ -52,6 +52,35 @@
 #include "net.h"
 #include "cjson.h"
 
+/* iperf_udp_handle_ctrl_dgram
+ *
+ * recognizes a UDP connect message or reply received on a stream socket
+ */
+int
+iperf_udp_handle_ctrl_dgram(struct iperf_test *test, int s, const void *buf, int len)
+{
+    unsigned int value, reply;
+
+    /* A data packet carries at least sec, usec and a packet count: a 4-byte datagram is never data */
+    if (len != sizeof(value))
+        return 0;
+    memcpy(&value, buf, sizeof(value));
+    if (value != UDP_CONNECT_MSG && value != UDP_CONNECT_REPLY && value != LEGACY_UDP_CONNECT_REPLY)
+        return 0;
+
+    /* The client resends its connect message when our reply was lost: answer again */
+    if (value == UDP_CONNECT_MSG && test->role == 's') {
+        if (test->debug)
+            printf("Repeated Connect message on Socket %d, replying again\n", s);
+        reply = UDP_CONNECT_REPLY;
+        if (write(s, &reply, sizeof(reply)) < 0) {
+            i_errno = IESTREAMWRITE;
+            return -1;
+        }
+    }
+    return 1;
+}
+
 /* iperf_udp_recv
  *
  * receives the data for UDP
@@ -103,6 +132,13 @@ iperf_udp_recv(struct iperf_stream *sp)
      */
     if (r <= 0)
         return r;
+
+    /* A repeated connect message or a late connect reply is not data */
+    if (r == sizeof(uint32_t)) {
+        int ctrl = iperf_udp_handle_ctrl_dgram(test, sp->socket, sp->buffer, r);
+        if (ctrl != 0)
+            return ctrl < 0 ? -1 : 0;
+    }
 
     // Check dgram_sz is greater than 0
     if (dgram_sz <= 0){
@@ -675,16 +711,48 @@ iperf_udp_listen(struct iperf_test *test)
  *
  * "Connect" to a UDP stream listener.
  */
+/* Receive timeout of a stream socket, in milliseconds (no-op without SO_RCVTIMEO) */
+static void
+iperf_udp_set_rcvtimeo(int s, int64_t ms)
+{
+#ifdef SO_RCVTIMEO
+    struct timeval tv;
+
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(struct timeval));
+#endif
+}
+
+static int
+iperf_udp_send_connect(struct iperf_test *test, int s, int attempt)
+{
+    unsigned int msg = UDP_CONNECT_MSG;
+
+    if (test->debug) {
+        if (attempt == 1)
+            printf("Sending Connect message to Socket %d\n", s);
+        else
+            printf("Resending Connect message to Socket %d (attempt %d)\n", s, attempt);
+    }
+    if (write(s, &msg, sizeof(msg)) < 0) {
+        // XXX: Should this be changed to IESTREAMCONNECT?
+        i_errno = IESTREAMWRITE;
+        return -1;
+    }
+    return 0;
+}
+
 int
 iperf_udp_connect(struct iperf_test *test)
 {
     int s, sz;
     unsigned int buf;
-#ifdef SO_RCVTIMEO
-    struct timeval tv;
-#endif
     int rc;
     int i, max_len_wait_for_reply;
+    int attempt;
+    int64_t wait_ms, left_ms;
+    struct iperf_time start, now, elapsed;
 
     /* Create and bind our local socket. */
     if ((s = netdial(test->settings->domain, Pudp, test->bind_address, test->bind_dev, test->bind_port, test->server_hostname, test->server_port, -1)) < 0) {
@@ -750,26 +818,26 @@ iperf_udp_connect(struct iperf_test *test)
         return -1;
     }
 
-#ifdef SO_RCVTIMEO
-    /* 30 sec timeout for a case when there is a network problem. */
-    tv.tv_sec = 30;
-    tv.tv_usec = 0;
-    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&tv, sizeof(struct timeval));
-#endif
+    /*
+     * Wait for the reply in slices: the connect message is resent after each one.
+     * The first slice covers several control round trips, so that a slow reply is
+     * not mistaken for a lost one; the next slices double.
+     */
+    wait_ms = UDP_CONNECT_RETRY_INTERVAL_MS;
+    if (test->ctrl_rtt_us / 1000 * UDP_CONNECT_RTT_FACTOR > wait_ms)
+        wait_ms = test->ctrl_rtt_us / 1000 * UDP_CONNECT_RTT_FACTOR;
+    if (wait_ms > UDP_CONNECT_TIMEOUT_SEC * 1000)
+        wait_ms = UDP_CONNECT_TIMEOUT_SEC * 1000;
+    iperf_udp_set_rcvtimeo(s, wait_ms);
 
     /*
      * Write a datagram to the UDP stream to let the server know we're here.
      * The server learns our address by obtaining its peer's address.
      */
-    buf = UDP_CONNECT_MSG;
-    if (test->debug) {
-        printf("Sending Connect message to Socket %d\n", s);
-    }
-    if (write(s, &buf, sizeof(buf)) < 0) {
-        // XXX: Should this be changed to IESTREAMCONNECT?
-        i_errno = IESTREAMWRITE;
+    attempt = 1;
+    iperf_time_now(&start);
+    if (iperf_udp_send_connect(test, s, attempt) < 0)
         return -1;
-    }
 
     /*
      * Wait until the server replies back to us with the "accept" response.
@@ -778,21 +846,51 @@ iperf_udp_connect(struct iperf_test *test)
     max_len_wait_for_reply = sizeof(buf);
     if (test->reverse || test->bidirectional) /* In reverse and bidirectional modes allow few packets to have the "accept" response - to handle out of order packets */
         max_len_wait_for_reply += MAX_REVERSE_OUT_OF_ORDER_PACKETS * test->settings->blksize;
-    do {
+    for (;;) {
         if ((sz = recv(s, &buf, sizeof(buf), 0)) < 0) {
+            /* No reply yet: it may have been lost, ask again until UDP_CONNECT_TIMEOUT_SEC */
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == ETIMEDOUT || errno == EINTR) {
+                iperf_time_now(&now);
+                iperf_time_diff(&now, &start, &elapsed);
+                left_ms = UDP_CONNECT_TIMEOUT_SEC * 1000LL - iperf_time_in_usecs(&elapsed) / 1000;
+                if (left_ms > 0) {
+                    wait_ms *= 2;
+                    if (wait_ms > UDP_CONNECT_MAX_INTERVAL_MS)
+                        wait_ms = UDP_CONNECT_MAX_INTERVAL_MS;
+                    if (wait_ms > left_ms)
+                        wait_ms = left_ms;
+                    iperf_udp_set_rcvtimeo(s, wait_ms);
+                    if (iperf_udp_send_connect(test, s, ++attempt) < 0)
+                        return -1;
+                    continue;
+                }
+            }
             i_errno = IESTREAMREAD;
             return -1;
         }
         if (test->debug) {
             printf("Connect received for Socket %d, sz=%d, buf=%x, i=%d, max_len_wait_for_reply=%d\n", s, sz, buf, i, max_len_wait_for_reply);
         }
+        if (buf == UDP_CONNECT_REPLY || buf == LEGACY_UDP_CONNECT_REPLY)
+            break;
+        /*
+         * The server sends reverse-stream data only once it has accepted the
+         * stream: the reply was lost or overtaken, the stream is connected.
+         */
+        if (test->reverse || test->bidirectional) {
+            if (test->debug)
+                printf("Data received on Socket %d before the Connect reply: stream accepted\n", s);
+            break;
+        }
         i += sz;
-    } while (buf != UDP_CONNECT_REPLY && buf != LEGACY_UDP_CONNECT_REPLY && i < max_len_wait_for_reply);
-
-    if (buf != UDP_CONNECT_REPLY  && buf != LEGACY_UDP_CONNECT_REPLY) {
-        i_errno = IESTREAMREAD;
-        return -1;
+        if (i >= max_len_wait_for_reply) {
+            i_errno = IESTREAMREAD;
+            return -1;
+        }
     }
+
+    /* Back to a 30 sec timeout for a case when there is a network problem. */
+    iperf_udp_set_rcvtimeo(s, UDP_CONNECT_TIMEOUT_SEC * 1000LL);
 
     return s;
 }

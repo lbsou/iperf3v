@@ -335,10 +335,17 @@ iperf_handle_message_client(struct iperf_test *test)
         case PARAM_EXCHANGE:
             if (iperf_exchange_parameters(test) < 0)
                 return -1;
+            iperf_time_now(&test->ctrl_rtt_start);
             if (test->on_connect)
                 test->on_connect(test);
             break;
         case CREATE_STREAMS:
+            {
+                /* Parameters sent -> CREATE_STREAMS received: about one round trip of the control connection */
+                struct iperf_time now, rtt;
+                if (iperf_time_now(&now) == 0 && iperf_time_diff(&now, &test->ctrl_rtt_start, &rtt) == 0)
+                    test->ctrl_rtt_us = iperf_time_in_usecs(&rtt);
+            }
             if (test->mode == BIDIRECTIONAL)
             {
                 if (iperf_create_streams(test, 1) < 0)

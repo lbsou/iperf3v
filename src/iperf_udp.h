@@ -60,5 +60,14 @@ int iperf_udp_connect(struct iperf_test *);
 
 int iperf_udp_init(struct iperf_test *);
 
+/**
+ * iperf_udp_handle_ctrl_dgram -- recognize a UDP connect message or reply
+ * received on a stream socket (a repeated connect message, or a late reply).
+ * On the server, a connect message is answered again on socket s.
+ *
+ * returns 1 if buf is such a control datagram, 0 if not, -1 on error
+ */
+int iperf_udp_handle_ctrl_dgram(struct iperf_test *test, int s, const void *buf, int len);
+
 
 #endif

@@ -318,6 +318,8 @@ struct iperf_test
     TAILQ_HEAD(xbind_addrhead, xbind_entry) xbind_addrs; /* all -X opts */
     int       bind_port;                        /* --cport option */
     int       server_port;
+    struct iperf_time ctrl_rtt_start;           /* client: when the parameters were sent */
+    int64_t   ctrl_rtt_us;                      /* client: parameters sent -> CREATE_STREAMS received, 0 if unknown */
     int       omit;                             /* duration of omit period (-O flag) */
     int       duration;                         /* total duration of test (-t flag) */
     int       max_server_duration;               /* maximum possible duration of test as enforced by the server (--max-server-duration flag) */
@@ -493,6 +495,17 @@ extern int gerror; /* error value from getaddrinfo(3), for use in internal error
 
 /* In Reverse mode, maximum number of packets to wait for "accept" response - to handle out of order packets */
 #define MAX_REVERSE_OUT_OF_ORDER_PACKETS 2
+
+/*
+ * The UDP connect message is resent until the reply arrives, for at most UDP_CONNECT_TIMEOUT_SEC.
+ * The first resend waits UDP_CONNECT_RETRY_INTERVAL_MS, or UDP_CONNECT_RTT_FACTOR control round
+ * trips if longer (a resend must not reach a server that already replied: an unmodified server
+ * would read it as data), then the wait doubles up to UDP_CONNECT_MAX_INTERVAL_MS.
+ */
+#define UDP_CONNECT_RETRY_INTERVAL_MS 1000
+#define UDP_CONNECT_RTT_FACTOR 4
+#define UDP_CONNECT_MAX_INTERVAL_MS 8000
+#define UDP_CONNECT_TIMEOUT_SEC 30
 
 #define GSO_MAX_DG_IN_BF (1 << 7UL) // 128 - the Linux Kernel limit hardcoded as `UDP_MAX_SEGMENTS (1 << 7UL)` in `udpgso.c`
 #define GSO_BF_MAX_SIZE MAX_UDP_BLOCKSIZE
