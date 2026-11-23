@@ -5187,14 +5187,24 @@ int
 iperf_common_sockopts(struct iperf_test *test, int s)
 {
     int opt;
+#if defined(_WIN32) || defined(__CYGWIN__)
+    int tos_failed = 0;
+#endif
 
     /* Set IP TOS */
     if ((opt = test->settings->tos)) {
 	if (getsockdomain(s) == AF_INET6) {
 #ifdef IPV6_TCLASS
 	    if (setsockopt(s, IPPROTO_IPV6, IPV6_TCLASS, &opt, sizeof(opt)) < 0) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+                /* On Windows, setting TOS/DSCP may require admin privileges */
+                tos_failed = 1;
+                if (test->debug)
+                    iperf_err(test, "warning: unable to set IPv6 traffic class (admin privileges may be required)");
+#else
                 i_errno = IESETCOS;
                 return -1;
+#endif
             }
 
 	    /* if the control connection was established with a mapped v4 address
@@ -5210,10 +5220,23 @@ iperf_common_sockopts(struct iperf_test *test, int s)
 #endif
         } else {
             if (setsockopt(s, IPPROTO_IP, IP_TOS, &opt, sizeof(opt)) < 0) {
+#if defined(_WIN32) || defined(__CYGWIN__)
+                /* On Windows, setting TOS/DSCP may require admin privileges */
+                tos_failed = 1;
+                if (test->debug)
+                    iperf_err(test, "warning: unable to set IP TOS (admin privileges may be required)");
+#else
                 i_errno = IESETTOS;
                 return -1;
+#endif
             }
         }
+#if defined(_WIN32) || defined(__CYGWIN__)
+        /* On Windows, warn once about TOS failure but continue */
+        if (tos_failed && test->debug) {
+            iperf_err(test, "note: QoS/DSCP settings may not be applied. Run as Administrator for full QoS support.");
+        }
+#endif
     }
     return 0;
 }
