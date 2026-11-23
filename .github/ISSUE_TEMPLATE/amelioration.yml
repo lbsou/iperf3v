@@ -1,0 +1,21 @@
+name: Amélioration
+description: Une demande de fonctionnalité ou d'amélioration
+labels: [amélioration]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Besoin
+      description: Le problème à résoudre, avant la solution
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Cas d'usage
+      description: Qui s'en sert, dans quelle situation, sur quel lien
+  - type: input
+    id: upstream
+    attributes:
+      label: Lien avec ESnet
+      description: Ticket ou PR esnet/iperf équivalent, s'il existe (numéro seulement)

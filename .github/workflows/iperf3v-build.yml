@@ -28,6 +28,8 @@ jobs:
           src/iperf3 --version | head -1
           src/iperf3 --version | head -1 | grep -q -- '-v[0-9]'
           src/iperf3 --help | grep -q -- --cntl-ka
+      - name: Watch script unit tests
+        run: python3 -m unittest discover -s iperf3v/watch
       - name: fix commits apply on the ESnet base tag
         run: bash iperf3v/tests/check_fix_patches_apply.sh
 

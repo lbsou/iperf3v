@@ -1,0 +1,46 @@
+name: Bug
+description: Un comportement anormal d'iperf3v
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Sortie de `iperf3v --version` (première ligne)
+      placeholder: iperf 3.22.1-v1 (cJSON 1.7.15)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Système
+      description: OS et version, des deux côtés si différent
+    validations:
+      required: true
+  - type: input
+    id: peer
+    attributes:
+      label: En face
+      description: L'autre extrémité est-elle iperf3v (quelle version) ou un iperf3 ESnet (quelle version) ?
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Commandes exactes
+      description: Client et serveur
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Attendu / obtenu
+    validations:
+      required: true
+  - type: textarea
+    id: debug
+    attributes:
+      label: Sortie --debug
+      description: Si possible, des deux côtés
+      render: text

@@ -1,0 +1,27 @@
+name: iperf3v ESnet watch
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch ESnet (read only, nothing is pushed)
+        run: |
+          git remote add upstream https://github.com/esnet/iperf.git
+          git fetch -q upstream --tags
+          git fetch -q upstream master
+      - name: Weekly digest and porting issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 iperf3v/watch/upstream_watch.py

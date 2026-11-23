@@ -1,0 +1,3 @@
+# ESnet issue and PR numbers that concern iperf3v (one per line); they head the weekly digest.
+1260  # PR: out-of-order tolerance in -R (bug 1 extends it to --bidir)
+1402  # PR: UDP connect retry (bug 2)
