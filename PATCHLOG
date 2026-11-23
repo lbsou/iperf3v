@@ -65,7 +65,7 @@ Patches on 3.22.1
         src/iperf_udp.c - iperf_udp_connect(): the out-of-order tolerance of
         -R (PR #1260) also applies to --bidir. netem "delay 30ms 12ms":
         10/20 failed before, 0/20 after (iperf3v/tests/test_bidir_reorder.sh).
-        Upstream: not proposed.
+        Upstream: issue esnet/iperf#2132, PR esnet/iperf#2134 (2026-11-23).
 
     fix: net: return one datagram per read in Nrecv_no_select for UDP
         src/net.c - the read loop filled the whole buffer, so a short UDP
@@ -148,7 +148,8 @@ Patches on 3.22.1
         also accepts a zero wait.
         Tests: iperf3v/tests/test_throttle_cpu.sh (Linux, 100 % -> 0 %),
         iperf3v/tests/windows_throttle.sh (Cygwin, 93 % -> 0 %).
-        Upstream: not proposed.
+        Upstream: issue esnet/iperf#2133, PR esnet/iperf#2135 (2026-11-23),
+        POSIX branch only.
 
 Known issues
 ------------

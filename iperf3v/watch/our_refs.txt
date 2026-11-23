@@ -1,3 +1,7 @@
 # ESnet issue and PR numbers that concern iperf3v (one per line); they head the weekly digest.
 1260  # PR: out-of-order tolerance in -R (bug 1 extends it to --bidir)
 1402  # PR: UDP connect retry (bug 2)
+2132  # issue: UDP --bidir out-of-order connect reply (ours)
+2133  # issue: rate-limited sender spins at 100% CPU (ours)
+2134  # PR: --bidir out-of-order fix (ours)
+2135  # PR: iperf_check_throttle sleep fix (ours)
