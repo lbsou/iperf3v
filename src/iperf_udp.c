@@ -120,8 +120,18 @@ iperf_udp_recv(struct iperf_stream *sp)
 	    first_packet = 1;
 	}
 
-	sp->result->bytes_received += r;
-	sp->result->bytes_received_this_interval += r;
+	/*
+	 * When skip_rx_copy is enabled, only the UDP header fields are read
+	 * (via MSG_TRUNC), so r reflects the truncated size, not the actual
+	 * datagram size. Use blksize for byte accounting in that case.
+	 */
+	int received_bytes = r;
+#if defined(HAVE_MSG_TRUNC)
+	if (test->settings->skip_rx_copy)
+	    received_bytes = sp->settings->blksize;
+#endif
+	sp->result->bytes_received += received_bytes;
+	sp->result->bytes_received_this_interval += received_bytes;
 
 	if (sp->test->debug)
 	    printf("received %d bytes of %d, total %" PRIu64 "\n", r, size, sp->result->bytes_received);
