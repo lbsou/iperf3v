@@ -318,6 +318,7 @@ struct iperf_test
     TAILQ_HEAD(xbind_addrhead, xbind_entry) xbind_addrs; /* all -X opts */
     int       bind_port;                        /* --cport option */
     int       server_port;
+    int       udp_shared_socket;                /* Windows server: socket receiving every UDP stream's datagrams, -1 if none */
     struct iperf_time ctrl_rtt_start;           /* client: when the parameters were sent */
     int64_t   ctrl_rtt_us;                      /* client: parameters sent -> CREATE_STREAMS received, 0 if unknown */
     int       omit;                             /* duration of omit period (-O flag) */

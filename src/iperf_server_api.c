@@ -789,7 +789,8 @@ iperf_run_server(struct iperf_test *test)
                     cleanup_server(test);
                     return -1;
                 }
-                if (FD_ISSET(test->prot_listener, &read_set)) {
+                if (FD_ISSET(test->prot_listener, &read_set) &&
+                    !(test->protocol->id == Pudp && iperf_udp_listener_repeat(test))) {
 
                     if ((s = test->protocol->accept(test)) < 0) {
 			cleanup_server(test);
@@ -911,8 +912,11 @@ iperf_run_server(struct iperf_test *test)
                 if (rec_streams_accepted == streams_to_rec && send_streams_accepted == streams_to_send) {
                     if (test->protocol->id != Ptcp) {
                         FD_CLR(test->prot_listener, &test->read_set);
-                        close(test->prot_listener);
-                        test->prot_listener = -1;
+                        /* A shared UDP receive socket (Windows) stays open until cleanup_server() */
+                        if (test->prot_listener != test->udp_shared_socket) {
+                            close(test->prot_listener);
+                            test->prot_listener = -1;
+                        }
                     } else {
                         if (test->no_delay || test->settings->mss || test->settings->socket_bufsize) {
                             FD_CLR(test->listener, &test->read_set);

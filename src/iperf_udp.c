@@ -105,6 +105,100 @@ iperf_udp_poll_accepted_streams(struct iperf_test *test, fd_set *read_set)
     return 0;
 }
 
+#if defined(IPERF_UDP_SHARED_RCV)
+/* The stream whose client has this address, or NULL */
+static struct iperf_stream *
+iperf_udp_find_stream(struct iperf_test *test, const struct sockaddr_storage *addr)
+{
+    struct iperf_stream *sp;
+
+    SLIST_FOREACH(sp, &test->streams, streams) {
+        const struct sockaddr_storage *peer = &sp->remote_addr;
+
+        if (peer->ss_family != addr->ss_family)
+            continue;
+        if (addr->ss_family == AF_INET) {
+            const struct sockaddr_in *a = (const struct sockaddr_in *) addr;
+            const struct sockaddr_in *b = (const struct sockaddr_in *) peer;
+            if (a->sin_port == b->sin_port && a->sin_addr.s_addr == b->sin_addr.s_addr)
+                return sp;
+        } else if (addr->ss_family == AF_INET6) {
+            const struct sockaddr_in6 *a = (const struct sockaddr_in6 *) addr;
+            const struct sockaddr_in6 *b = (const struct sockaddr_in6 *) peer;
+            if (a->sin6_port == b->sin6_port && memcmp(&a->sin6_addr, &b->sin6_addr, sizeof(a->sin6_addr)) == 0)
+                return sp;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * Reads one datagram from the shared receive socket into the buffer of the
+ * stream it belongs to and makes *spp that stream. Only the first receiving
+ * stream's thread reads the shared socket, so that each stream's statistics
+ * keep a single writer; the other receiving threads idle.
+ * Returns the datagram size, 0 if there is nothing for this thread, <0 on error.
+ */
+static int
+iperf_udp_shared_read(struct iperf_stream **spp)
+{
+    struct iperf_stream *sp = *spp, *owner = NULL, *it, *target;
+    struct iperf_test *test = sp->test;
+    struct sockaddr_storage from;
+    socklen_t len = sizeof(from);
+    int r;
+
+    SLIST_FOREACH(it, &test->streams, streams) {
+        if (!it->sender) {
+            owner = it;
+            break;
+        }
+    }
+    if (sp != owner) {
+        usleep(10000);
+        return 0;
+    }
+    r = recvfrom(test->udp_shared_socket, sp->buffer, sp->settings->blksize, 0, (struct sockaddr *) &from, &len);
+    if (r < 0)
+        return (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR || errno == EMSGSIZE) ? 0 : NET_HARDERROR;
+    target = iperf_udp_find_stream(test, &from);
+    if (target == NULL)
+        return 0;                   /* not from a client of this test */
+    if (target->sender && r != sizeof(uint32_t))
+        return 0;                   /* a sending stream only expects a repeated connect message */
+    if (target != sp)
+        memcpy(target->buffer, sp->buffer, r);
+    *spp = target;
+    return r;
+}
+
+int
+iperf_udp_listener_repeat(struct iperf_test *test)
+{
+    struct sockaddr_storage from;
+    socklen_t len = sizeof(from);
+    unsigned int buf;
+    struct iperf_stream *sp;
+    int sz;
+
+    if (SLIST_EMPTY(&test->streams))
+        return 0;
+    if ((sz = recvfrom(test->prot_listener, &buf, sizeof(buf), MSG_PEEK, (struct sockaddr *) &from, &len)) < 0)
+        return 0;
+    if ((sp = iperf_udp_find_stream(test, &from)) == NULL)
+        return 0;
+    if (recv(test->prot_listener, &buf, sizeof(buf), 0) == sizeof(buf))
+        (void) iperf_udp_handle_ctrl_dgram(test, sp->socket, &buf, sizeof(buf));
+    return 1;
+}
+#else
+int
+iperf_udp_listener_repeat(struct iperf_test *test)
+{
+    return 0;
+}
+#endif /* IPERF_UDP_SHARED_RCV */
+
 /* iperf_udp_recv
  *
  * receives the data for UDP
@@ -135,6 +229,14 @@ iperf_udp_recv(struct iperf_stream *sp)
     }
 #endif /* HAVE_MSG_TRUNC */
 
+#if defined(IPERF_UDP_SHARED_RCV)
+    if (test->role == 's' && test->udp_shared_socket >= 0) {
+	/* Windows server: one shared socket receives every stream's datagrams */
+	r = iperf_udp_shared_read(&sp);
+	dgram_sz = sp->settings->blksize;
+	buf_sz = r;
+    } else
+#endif
     /* Configure loop parameters based on GRO availability */
     if (sp->test->settings->gro) {
 	size = sp->test->settings->gro_bf_size;
@@ -620,10 +722,38 @@ iperf_udp_accept(struct iperf_test *test)
         return -1;
     }
 
+#if defined(IPERF_UDP_SHARED_RCV)
+    /*
+     * Windows hands every UDP datagram to the first socket bound to the port and
+     * never to a later one, connected or not: a connected listener would drop the
+     * next streams' connect messages. The listener therefore stays unconnected as
+     * the shared receive socket, and the stream gets its own socket, bound to the
+     * same port and connected to the client, to send (data and the reply).
+     */
+    {
+        int c;
+
+        if (iperf_udp_buffercheck(test, s) < 0)
+            return -1;
+        c = netannounce(test->settings->domain, Pudp, test->bind_address, test->bind_dev, test->server_port);
+        if (c < 0) {
+            i_errno = IESTREAMLISTEN;
+            return -1;
+        }
+        if (connect(c, (struct sockaddr *) &sa_peer, len) < 0) {
+            close(c);
+            i_errno = IESTREAMACCEPT;
+            return -1;
+        }
+        test->udp_shared_socket = s;
+        s = c;
+    }
+#else
     if (connect(s, (struct sockaddr *) &sa_peer, len) < 0) {
         i_errno = IESTREAMACCEPT;
         return -1;
     }
+#endif
 
     /* Check and set socket buffer sizes */
     rc = iperf_udp_buffercheck(test, s);
@@ -682,6 +812,7 @@ iperf_udp_accept(struct iperf_test *test)
         return -1;
     }
 
+#if !defined(IPERF_UDP_SHARED_RCV)
     /*
      * Create a new "listening" socket to replace the one we were using before.
      */
@@ -693,6 +824,7 @@ iperf_udp_accept(struct iperf_test *test)
     }
 
     FD_SET(test->prot_listener, &test->read_set);
+#endif
     test->max_fd = (test->max_fd < test->prot_listener) ? test->prot_listener : test->max_fd;
 
     /* Let the client know we're ready "accept" another UDP "stream" */

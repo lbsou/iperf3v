@@ -3548,6 +3548,7 @@ iperf_defaults(struct iperf_test *testp)
     testp->ctrl_sck = -1;
     testp->listener = -1;
     testp->prot_listener = -1;
+    testp->udp_shared_socket = -1;
     testp->other_side_has_retransmits = 0;
 
     testp->stats_callback = iperf_stats_callback;
@@ -3855,6 +3856,7 @@ iperf_reset_test(struct iperf_test *test)
     test->ctrl_sck = -1;
     test->listener = -1;
     test->prot_listener = -1;
+    test->udp_shared_socket = -1;
 
     test->bytes_sent = 0;
     test->blocks_sent = 0;

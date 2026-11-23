@@ -78,5 +78,23 @@ int iperf_udp_handle_ctrl_dgram(struct iperf_test *test, int s, const void *buf,
  */
 int iperf_udp_poll_accepted_streams(struct iperf_test *test, fd_set *read_set);
 
+/*
+ * Windows/Cygwin server: Windows hands every UDP datagram to the first socket
+ * bound to the port, so one shared socket receives the datagrams of every
+ * stream and iperf3v dispatches them by sender address (see iperf_udp_accept).
+ */
+#if defined(__CYGWIN__) || defined(_WIN32)
+#define IPERF_UDP_SHARED_RCV 1
+#endif
+
+/**
+ * iperf_udp_listener_repeat -- with a shared receive socket, a connect message
+ * repeated by a client already accepted reaches the listener: answer it on the
+ * stream's socket instead of accepting a new stream.
+ *
+ * returns 1 if the pending datagram was such a message (consumed), 0 otherwise
+ */
+int iperf_udp_listener_repeat(struct iperf_test *test);
+
 
 #endif
