@@ -15,7 +15,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build the fork and the ESnet base tag, run iperf3v/tests
+      - name: Static package, as released (Alpine, musl)
+        run: |
+          v=$(sed -n 's/^AC_INIT(\[iperf\],\[\([^]]*\)\].*/\1/p' configure.ac)
+          docker run --rm -v "$PWD":/src -w /src alpine:3.22 \
+            sh -c "apk add -q bash && bash iperf3v/package-linux.sh $v"
+          mkdir "$RUNNER_TEMP/static"
+          tar -xzf dist/iperf3v-*-linux-x86_64.tar.gz -C "$RUNNER_TEMP/static" --strip-components=2 --wildcards '*/bin/iperf3v'
+      - name: Build the ESnet base tag, run iperf3v/tests on the static binary
         run: |
           sudo modprobe sch_netem || true
-          sudo GITHUB_WORKSPACE="$GITHUB_WORKSPACE" bash iperf3v/tests/ci-linux.sh
+          sudo GITHUB_WORKSPACE="$GITHUB_WORKSPACE" IPERF3V_PREBUILT="$RUNNER_TEMP/static/iperf3v" \
+            bash iperf3v/tests/ci-linux.sh
