@@ -13,10 +13,14 @@ dir=$(find "$tmp" -mindepth 1 -maxdepth 1 -type d)
 bin=$dir/bin/iperf3v
 [ -x "$bin" ] || fail "no bin/iperf3v in $tgz"
 
-needed=$(readelf -d "$bin" | grep NEEDED || true)
+command -v readelf >/dev/null || fail "readelf not found (install binutils)"
+dyn=$(readelf -dW "$bin") || fail "readelf cannot read $bin (not an ELF file?)"
+hdr=$(readelf -lW "$bin") || fail "readelf cannot read the program headers of $bin"
+case "$hdr" in *LOAD*) ;; *) fail "no loadable segment in $bin (not an executable?)";; esac
+needed=$(printf '%s\n' "$dyn" | grep NEEDED || true)
 [ -z "$needed" ] || fail "shared libraries needed:
 $needed"
-! readelf -l "$bin" | grep -q INTERP || fail "has a program interpreter (dynamic loader)"
+case "$hdr" in *INTERP*) fail "has a program interpreter (dynamic loader)";; esac
 "$bin" --help | grep -q -- --cntl-ka || fail "--cntl-ka missing"
 "$bin" --version | grep -q authentication || fail "built without OpenSSL authentication"
 for f in LICENSE PATCHLOG README-iperf3v.md share/man/man1/iperf3v.1; do
