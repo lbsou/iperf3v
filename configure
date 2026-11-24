@@ -17497,6 +17497,49 @@ printf '%s\n' "#define HAVE_TCP_KEEPALIVE 1" >>confdefs.h
 
 fi
 
+# macOS has no TCP_KEEPIDLE: its TCP_KEEPALIVE option sets the same idle
+# time (src/iperf.h maps one to the other)
+if test "x$iperf3_cv_header_tcp_keepalive" = "xno"; then
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking TCP_KEEPALIVE socket option (macOS)" >&5
+printf %s "checking TCP_KEEPALIVE socket option (macOS)... " >&6; }
+if test ${iperf3_cv_header_tcp_keepalive_apple+y}
+then :
+  printf %s "(cached) " >&6
+else case e in #(
+  e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <sys/types.h>
+                     #include <netinet/tcp.h>
+int
+main (void)
+{
+#ifndef __APPLE__
+                     #error not macOS
+                     #endif
+                     int foo = TCP_KEEPALIVE + TCP_KEEPINTVL + TCP_KEEPCNT;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"
+then :
+  iperf3_cv_header_tcp_keepalive_apple=yes
+else case e in #(
+  e) iperf3_cv_header_tcp_keepalive_apple=no ;;
+esac
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext ;;
+esac
+fi
+{ printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $iperf3_cv_header_tcp_keepalive_apple" >&5
+printf '%s\n' "$iperf3_cv_header_tcp_keepalive_apple" >&6; }
+if test "x$iperf3_cv_header_tcp_keepalive_apple" = "xyes"; then
+
+printf '%s\n' "#define HAVE_TCP_KEEPALIVE 1" >>confdefs.h
+
+fi
+fi
+
 # Check for IPv6 flowlabel support (believed to be Linux only)
 # We check for IPV6_FLOWLABEL_MGR in <linux/in6.h> even though we
 # don't use that file directly (we have our own stripped-down

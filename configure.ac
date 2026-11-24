@@ -229,6 +229,25 @@ if test "x$iperf3_cv_header_tcp_keepalive" = "xyes"; then
     AC_DEFINE([HAVE_TCP_KEEPALIVE], [1], [Have TCP_KEEPIDLE sockopt.])
 fi
 
+# macOS has no TCP_KEEPIDLE: its TCP_KEEPALIVE option sets the same idle
+# time (src/iperf.h maps one to the other)
+if test "x$iperf3_cv_header_tcp_keepalive" = "xno"; then
+AC_CACHE_CHECK([TCP_KEEPALIVE socket option (macOS)],
+[iperf3_cv_header_tcp_keepalive_apple],
+AC_COMPILE_IFELSE(
+  [AC_LANG_PROGRAM([[#include <sys/types.h>
+                     #include <netinet/tcp.h>]],
+                   [[#ifndef __APPLE__
+                     #error not macOS
+                     #endif
+                     int foo = TCP_KEEPALIVE + TCP_KEEPINTVL + TCP_KEEPCNT;]])],
+  iperf3_cv_header_tcp_keepalive_apple=yes,
+  iperf3_cv_header_tcp_keepalive_apple=no))
+if test "x$iperf3_cv_header_tcp_keepalive_apple" = "xyes"; then
+    AC_DEFINE([HAVE_TCP_KEEPALIVE], [1], [Have TCP_KEEPIDLE sockopt.])
+fi
+fi
+
 # Check for IPv6 flowlabel support (believed to be Linux only)
 # We check for IPV6_FLOWLABEL_MGR in <linux/in6.h> even though we
 # don't use that file directly (we have our own stripped-down

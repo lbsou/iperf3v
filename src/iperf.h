@@ -43,6 +43,10 @@
 #else
 #include <netinet/tcp.h>
 #endif
+#if defined(__APPLE__) && !defined(TCP_KEEPIDLE) && defined(TCP_KEEPALIVE)
+/* macOS names the idle time before keepalive probes TCP_KEEPALIVE */
+#define TCP_KEEPIDLE TCP_KEEPALIVE
+#endif
 #include <net/if.h> // for IFNAMSIZ
 
 #if defined(HAVE_CPUSET_SETAFFINITY)
