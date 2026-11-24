@@ -93,6 +93,12 @@ jobs:
         run: bash iperf3v/tests/loopback_udp.sh src/iperf3
       - name: Rate-limited sender does not spin (about 2.5 min)
         run: bash iperf3v/tests/loopback_throttle.sh src/iperf3
+      - name: --cntl-ka sets the control connection keepalive
+        run: |
+          src/iperf3 -s -1 -p 5289 > /dev/null 2>&1 &
+          sleep 1
+          src/iperf3 -c 127.0.0.1 -p 5289 -t 1 --cntl-ka=20/5/3 -V | tee ka.log
+          grep -q 'TCP_KEEPIDLE/TCP_KEEPINTVL/TCP_KEEPCNT are set to 20/5/3' ka.log
       - name: Package (static OpenSSL, --cntl-ka)
         run: |
           make distclean >/dev/null
