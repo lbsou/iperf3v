@@ -151,6 +151,37 @@ Patches on 3.22.1
         Upstream: issue esnet/iperf#2133, PR esnet/iperf#2135 (2026-11-23),
         POSIX branch only.
 
+    fork: make the loopback tests portable (Cygwin, macOS, Linux)
+        iperf3v/tests/loopback_udp.sh, iperf3v/tests/loopback_throttle.sh
+        (were windows_loopback.sh and windows_throttle.sh).
+
+    fork: fully static Linux packages (musl), x86_64 and aarch64
+        iperf3v/package-linux.sh (Alpine, --enable-static-bin, static
+        OpenSSL), iperf3v/tests/check_static_linux.sh (no NEEDED entry, no
+        program interpreter, runs alone in a FROM scratch image), build and
+        release workflows (ubuntu-latest and ubuntu-24.04-arm runners).
+
+    fork: run the network regressions on the static binary
+        iperf3v/tests/ci-linux.sh (IPERF3V_PREBUILT),
+        .github/workflows/iperf3v-regress.yml.
+
+    fork: macOS CI and arm64 package
+        iperf3v/package-macos.sh (Homebrew OpenSSL linked statically, otool -L
+        allows only /usr/lib and /System), .github/workflows/iperf3v-build.yml.
+
+    fix: configure: enable --cntl-ka on macOS (TCP_KEEPALIVE)
+        configure.ac, configure, src/iperf.h - macOS has no TCP_KEEPIDLE (its
+        TCP_KEEPALIVE sets the same idle time), so the TCP_KEEPIDLE check
+        failed and --cntl-ka was missing from every macOS build. When
+        TCP_KEEPIDLE is missing, configure checks TCP_KEEPALIVE, TCP_KEEPINTVL
+        and TCP_KEEPCNT on __APPLE__ and iperf.h maps TCP_KEEPIDLE to
+        TCP_KEEPALIVE. Other systems unchanged. Edits the generated configure
+        too, like the Cygwin TCP_KEEPIDLE patch.
+        Test: macOS CI job, --cntl-ka=20/5/3 -V reports 20/5/3.
+        Upstream: not proposed.
+
+    fork: macOS CI checks that --cntl-ka sets the keepalive options
+
 Known issues
 ------------
 

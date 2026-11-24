@@ -1,7 +1,7 @@
 # iperf3v
 
 **A maintained fork of [ESnet iperf3](https://github.com/esnet/iperf) for long-running UDP measurements on unstable
-links, on Linux and on Windows.**
+links, on Linux, Windows and macOS.**
 
 iperf3v follows the ESnet releases closely: each version is an ESnet tag plus a short series of patches, one commit
 each, listed in [`PATCHLOG`](../PATCHLOG). It talks to a stock iperf3 in both directions, and the generic fixes are
@@ -10,8 +10,13 @@ proposed back to ESnet. The binary is called `iperf3v`, so it can live next to a
 > iperf3v is an independent fork. It is not affiliated with, endorsed or supported by ESnet, Lawrence Berkeley National
 > Laboratory or the U.S. Department of Energy. Please report iperf3v problems here, not to ESnet.
 
-**[Download the latest release](https://github.com/lbsou/iperf3v/releases/latest)**: a Windows zip (`iperf3v.exe`
-and the three Cygwin DLLs it needs, nothing to install) and a Linux x86_64 tarball.
+**[Download the latest release](https://github.com/lbsou/iperf3v/releases/latest)**. Nothing to install:
+
+- Windows: a zip with `iperf3v.exe` and the three Cygwin DLLs it needs.
+- Linux x86_64 and aarch64: one fully static binary (musl, OpenSSL built in) that runs on any distribution, old
+  glibc or none at all.
+- macOS on Apple Silicon (arm64): the binary is not signed, so remove the quarantine flag once after extracting it:
+  `xattr -d com.apple.quarantine bin/iperf3v`.
 
 ## Why this fork
 
@@ -54,6 +59,7 @@ Windows/Cygwin port that had been maintained separately until now:
 | Rate-limited sender keeps sleeping (no 100% CPU in long tests) | all | [issue #2133](https://github.com/esnet/iperf/issues/2133), [PR #2135](https://github.com/esnet/iperf/pull/2135) |
 | Lost UDP connect reply: resent, with an implicit reply in `-R`/`--bidir` | all (full recovery needs iperf3v on both ends) | related to [PR #1402](https://github.com/esnet/iperf/pull/1402) |
 | `--skip-rx-copy` byte accounting | all | not proposed yet |
+| `--cntl-ka` (control connection keepalive) available on macOS | macOS | not proposed yet |
 | Shared UDP receive socket for servers with several streams | Windows | n/a (Windows unsupported upstream) |
 | High-resolution pacing timer, TransmitFile, non-fatal DSCP, `--cntl-ka` build fix | Windows | n/a |
 
@@ -83,6 +89,16 @@ Linux:
 make && sudo make install
 ```
 
+The release's fully static Linux binary is built on Alpine Linux:
+
+```sh
+docker run --rm -v "$PWD":/src -w /src alpine:3.22 \
+    sh -c 'apk add -q bash && bash iperf3v/package-linux.sh <version>'
+```
+
+macOS, with the Xcode command line tools and `brew install openssl@3`: `bash iperf3v/package-macos.sh <version>`
+(Homebrew's OpenSSL is linked statically, so the binary does not need Homebrew).
+
 Windows, in a Cygwin shell with `gcc-core make libssl-devel zlib-devel`:
 
 ```sh
@@ -97,8 +113,9 @@ ship it as `iperf3v.exe` with `cygwin1.dll`, `cygcrypto-3.dll` and `cygz.dll`. M
 
 Besides ESnet's `make check`, `iperf3v/tests/` reproduces each problem above: Linux network namespaces with `netem`
 and `iptables` (reordering, lost or slow connect replies, CPU use of a long rate-limited sender, interoperability
-with the ESnet base tag), and Windows loopback tests for multi-stream UDP servers and sender CPU use. GitHub Actions
-runs them on Linux and on Windows for every push.
+with the ESnet base tag, run on the static release binary), and loopback tests for multi-stream UDP servers and
+sender CPU use on Windows and macOS. GitHub Actions runs them on Linux, Windows and macOS for every push, and checks
+that the Linux binary is fully static and the macOS one needs only system libraries.
 
 ## Reporting problems
 

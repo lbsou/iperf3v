@@ -6,7 +6,8 @@
 > lost UDP connect reply). It interoperates with ESnet iperf3 in both directions (limits listed in
 > `PATCHLOG`). The binary is
 > named `iperf3v` so it never clashes with a distribution's `iperf3` package. Generic fixes are proposed
-> upstream. License: BSD (see `LICENSE`), copyright The Regents of the University of California (LBNL/ESnet).
+> upstream. Releases: Windows x86_64, fully static Linux x86_64 and aarch64, macOS arm64
+> (with `--cntl-ka`). License: BSD (see `LICENSE`), copyright The Regents of the University of California (LBNL/ESnet).
 
 Fork maintenu d'iperf3 (ESnet). Le `README.md` d'origine reste intact ; ce fichier décrit seulement
 ce qui diffère.
@@ -17,6 +18,7 @@ La liste à jour des patchs, avec leur statut en amont, est dans [`PATCHLOG`](PA
 
 - **Windows / Cygwin** : minuterie haute résolution pour le débit cible, TransmitFile (zéro copie),
   DSCP non bloquant, `--cntl-ka` disponible.
+- **macOS** : `--cntl-ka` disponible (macOS nomme `TCP_KEEPALIVE` l'option `TCP_KEEPIDLE`).
 - **UDP sur liens instables** : tolérance aux paquets hors ordre en `--bidir` ; renvoi du message
   « connect » UDP quand la réponse se perd.
 - **Interopérabilité** : un `iperf3v` fonctionne face à un iperf3 ESnet, dans les deux sens. Les
@@ -50,7 +52,20 @@ cp src/.libs/iperf3.exe iperf3v.exe   # ou src/iperf3.exe selon la présence de 
 À livrer à côté de `iperf3v.exe` : `cygwin1.dll`, `cygcrypto-3.dll`, `cygz.dll`.
 `configure` doit afficher `checking TCP_KEEPIDLE socket option... yes`.
 
-Les binaires prêts à l'emploi sont dans les Releases GitHub.
+Binaire Linux entièrement statique (celui des releases, musl et OpenSSL inclus), sous Alpine :
+
+```sh
+docker run --rm -v "$PWD":/src -w /src alpine:3.22 \
+    sh -c 'apk add -q bash && bash iperf3v/package-linux.sh <version>'
+```
+
+macOS (outils en ligne de commande Xcode, `brew install openssl@3`) :
+`bash iperf3v/package-macos.sh <version>`. OpenSSL y est lié en statique : le binaire n'a pas besoin
+de Homebrew.
+
+Les binaires prêts à l'emploi sont dans les Releases GitHub : Windows x86_64, Linux x86_64 et
+aarch64 (statiques, toute distribution), macOS arm64. Le binaire macOS n'est pas signé : après
+extraction, `xattr -d com.apple.quarantine bin/iperf3v`.
 
 ## Branches
 
