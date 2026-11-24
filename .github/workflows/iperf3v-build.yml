@@ -55,9 +55,9 @@ jobs:
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
         run: |
           cd "$GITHUB_WORKSPACE"
-          bash iperf3v/tests/windows_loopback.sh
+          bash iperf3v/tests/loopback_udp.sh
       - name: Rate-limited sender does not spin (about 2.5 min)
         shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
         run: |
           cd "$GITHUB_WORKSPACE"
-          bash iperf3v/tests/windows_throttle.sh
+          bash iperf3v/tests/loopback_throttle.sh

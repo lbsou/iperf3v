@@ -1,13 +1,24 @@
 #!/bin/bash
-# Windows/Cygwin loopback test of the UDP server with one and several stream
-# sockets. Windows hands every UDP datagram to the first socket bound to the
-# port, so a server with more than one stream socket needs iperf3v's shared
-# receive socket. Usage (Cygwin, repository root): iperf3v/tests/windows_loopback.sh [binary]
+# Loopback test of the UDP server with one and several stream sockets.
+# Windows hands every UDP datagram to the first socket bound to the port, so
+# a Windows server with more than one stream socket needs iperf3v's shared
+# receive socket; on Linux and macOS this checks the ESnet code path.
+# Usage (repository root, Cygwin, macOS or Linux): iperf3v/tests/loopback_udp.sh [binary]
 set -u
-B=${1:-src/.libs/iperf3.exe}
-[ -f "$B" ] || B=src/iperf3.exe
+B=${1:-}
+if [ -z "$B" ]; then
+    for B in src/.libs/iperf3.exe src/iperf3.exe src/iperf3; do [ -f "$B" ] && break; done
+fi
 PORT=5287
 failed=0
+
+# timeout(1) is not part of macOS
+run_limited() {
+    local secs=$1; shift
+    if command -v timeout >/dev/null; then timeout "$secs" "$@"
+    else perl -e 'alarm shift; exec @ARGV or die "exec: $!"' "$secs" "$@"
+    fi
+}
 
 case_lo() {
     local label="$*" srv_pid t0 t1 rc why= lost
@@ -15,7 +26,7 @@ case_lo() {
     srv_pid=$!
     sleep 1
     t0=$(date +%s)
-    timeout 40 "$B" -c 127.0.0.1 -p "$PORT" -J -u -b 1M -l 1200 -t 2 "$@" > /tmp/i3v-lo.json 2>/dev/null
+    run_limited 40 "$B" -c 127.0.0.1 -p "$PORT" -J -u -b 1M -l 1200 -t 2 "$@" > /tmp/i3v-lo.json 2>/dev/null
     rc=$?
     t1=$(date +%s)
     kill "$srv_pid" 2>/dev/null; wait "$srv_pid" 2>/dev/null

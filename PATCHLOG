@@ -130,7 +130,7 @@ Patches on 3.22.1
         by sender address (each stream's statistics keep a single writer); a
         connect message repeated by an accepted client is answered on its
         stream's socket. Linux and other systems keep the ESnet code.
-        Test: iperf3v/tests/windows_loopback.sh (CI, Cygwin job).
+        Test: iperf3v/tests/loopback_udp.sh (CI, Cygwin job).
         Upstream: not proposed (ESnet does not support Windows).
 
     fork: version 3.22.1-v2
@@ -147,7 +147,7 @@ Patches on 3.22.1
         Windows high-resolution timer") had the same hole; its fixup commit
         also accepts a zero wait.
         Tests: iperf3v/tests/test_throttle_cpu.sh (Linux, 100 % -> 0 %),
-        iperf3v/tests/windows_throttle.sh (Cygwin, 93 % -> 0 %).
+        iperf3v/tests/loopback_throttle.sh (Cygwin, 93 % -> 0 %).
         Upstream: issue esnet/iperf#2133, PR esnet/iperf#2135 (2026-11-23),
         POSIX branch only.
 
