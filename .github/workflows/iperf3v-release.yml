@@ -49,7 +49,7 @@ jobs:
           path: dist/*
 
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15   # oldest supported macOS: Homebrew's OpenSSL is built for the runner's version
     steps:
       - uses: actions/checkout@v4
       - name: Package (static OpenSSL, --cntl-ka)

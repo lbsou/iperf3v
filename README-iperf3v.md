@@ -6,7 +6,7 @@
 > lost UDP connect reply). It interoperates with ESnet iperf3 in both directions (limits listed in
 > `PATCHLOG`). The binary is
 > named `iperf3v` so it never clashes with a distribution's `iperf3` package. Generic fixes are proposed
-> upstream. Releases: Windows x86_64, fully static Linux x86_64 and aarch64, macOS arm64
+> upstream. Releases: Windows x86_64, fully static Linux x86_64 and aarch64, macOS 15+ arm64
 > (with `--cntl-ka`). License: BSD (see `LICENSE`), copyright The Regents of the University of California (LBNL/ESnet).
 
 Fork maintenu d'iperf3 (ESnet). Le `README.md` d'origine reste intact ; ce fichier décrit seulement
@@ -64,7 +64,7 @@ macOS (outils en ligne de commande Xcode, `brew install openssl@3`) :
 de Homebrew.
 
 Les binaires prêts à l'emploi sont dans les Releases GitHub : Windows x86_64, Linux x86_64 et
-aarch64 (statiques, toute distribution), macOS arm64. Le binaire macOS n'est pas signé : après
+aarch64 (statiques, toute distribution), macOS 15 ou plus récent sur arm64. Le binaire macOS n'est pas signé : après
 extraction, `xattr -d com.apple.quarantine bin/iperf3v`.
 
 ## Branches

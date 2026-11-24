@@ -15,7 +15,7 @@ proposed back to ESnet. The binary is called `iperf3v`, so it can live next to a
 - Windows: a zip with `iperf3v.exe` and the three Cygwin DLLs it needs.
 - Linux x86_64 and aarch64: one fully static binary (musl, OpenSSL built in) that runs on any distribution, old
   glibc or none at all.
-- macOS on Apple Silicon (arm64): the binary is not signed, so remove the quarantine flag once after extracting it:
+- macOS 15 or later on Apple Silicon (arm64): the binary is not signed, so remove the quarantine flag once after extracting it:
   `xattr -d com.apple.quarantine bin/iperf3v`.
 
 ## Why this fork

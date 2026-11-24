@@ -79,7 +79,7 @@ jobs:
           bash iperf3v/tests/loopback_throttle.sh
 
   macos:
-    runs-on: macos-latest
+    runs-on: macos-15   # oldest supported macOS: Homebrew's OpenSSL is built for the runner's version
     steps:
       - uses: actions/checkout@v4
       - name: Build and unit tests
