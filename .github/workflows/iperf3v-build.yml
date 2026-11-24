@@ -33,6 +33,22 @@ jobs:
       - name: fix commits apply on the ESnet base tag
         run: bash iperf3v/tests/check_fix_patches_apply.sh
 
+  linux-static:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static package (Alpine, musl)
+        run: |
+          v=$(sed -n 's/^AC_INIT(\[iperf\],\[\([^]]*\)\].*/\1/p' configure.ac)
+          docker run --rm -v "$PWD":/src -w /src alpine:3.22 \
+            sh -c "apk add -q bash && bash iperf3v/package-linux.sh $v"
+      - name: Check that it is fully static and runs alone
+        run: bash iperf3v/tests/check_static_linux.sh dist/iperf3v-*-linux-*.tar.gz
+
   cygwin:
     runs-on: windows-latest
     steps:
