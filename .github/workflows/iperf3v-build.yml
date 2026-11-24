@@ -77,3 +77,24 @@ jobs:
         run: |
           cd "$GITHUB_WORKSPACE"
           bash iperf3v/tests/loopback_throttle.sh
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and unit tests
+        run: |
+          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+          ./configure --disable-shared --with-openssl="$(brew --prefix openssl@3)" | tee cfg.log
+          make -j"$(sysctl -n hw.ncpu)"
+          make check
+          src/iperf3 --version
+      - name: Loopback UDP server tests, one and several stream sockets
+        run: bash iperf3v/tests/loopback_udp.sh src/iperf3
+      - name: Rate-limited sender does not spin (about 2.5 min)
+        run: bash iperf3v/tests/loopback_throttle.sh src/iperf3
+      - name: Package (static OpenSSL, --cntl-ka)
+        run: |
+          make distclean >/dev/null
+          v=$(sed -n 's/^AC_INIT(\[iperf\],\[\([^]]*\)\].*/\1/p' configure.ac)
+          bash iperf3v/package-macos.sh "$v"
