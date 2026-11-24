@@ -32,9 +32,15 @@ sleep "$MEASURE_AT"
 c0=$(cpu_cs "$cpid")
 sleep "$WINDOW"
 c1=$(cpu_cs "$cpid")
+alive=yes
+kill -0 "$cpid" 2>/dev/null || alive=no
 kill "$cpid" "$spid" 2>/dev/null; wait 2>/dev/null
 
-case "$c0$c1" in ''|*[!0-9]*) echo "FAIL  no CPU measurement for the client (pid $cpid: '$c0' '$c1')"; exit 1;; esac
+for c in "$c0" "$c1"; do
+    case "$c" in ''|*[!0-9]*) echo "FAIL  no CPU measurement for the client (pid $cpid: '$c0' '$c1')"; exit 1;; esac
+done
+[ "$alive" = yes ] || { echo "FAIL  the client exited during the measurement"; exit 1; }
+[ "$c1" -ge "$c0" ] || { echo "FAIL  CPU time went backwards ($c0 -> $c1)"; exit 1; }
 pct=$(( (c1 - c0) / WINDOW ))
 echo "client process at ${pct}% of a core after ${MEASURE_AT}s (threshold 128s)"
 [ "$pct" -lt "$MAX_PCT" ]
