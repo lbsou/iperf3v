@@ -25,7 +25,7 @@
 
 # Initialize the autoconf system for the specified tool, version and mailing list
 AC_PREREQ([2.71])
-AC_INIT([iperf],[3.22.1-v2],[https://github.com/lbsou/iperf3v/issues],[iperf],[https://software.es.net/iperf/])
+AC_INIT([iperf],[3.22.1-v3],[https://github.com/lbsou/iperf3v/issues],[iperf],[https://software.es.net/iperf/])
 m4_include([config/ax_check_openssl.m4])
 m4_include([config/ax_pthread.m4])
 m4_include([config/iperf_config_static_bin.m4])
